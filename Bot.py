@@ -6,6 +6,7 @@ import pyautogui
 import time
 import io
 import hashlib
+import cv2
 
 class Bot:
     def __init__(self, botToken, admin):
@@ -25,6 +26,7 @@ class Bot:
         self.bot.add_handler(CommandHandler("type", self.handle_type_text))
         self.bot.add_handler(CommandHandler("press", self.handle_press_key))
         self.bot.add_handler(CommandHandler("livemode", self.handle_live))
+        self.bot.add_handler(CommandHandler("photo", self.handle_photo))
         self.bot.add_handler(MessageHandler((filters.TEXT | filters.PHOTO) & ~filters.COMMAND, self.handle_text))
 
     # Send 
@@ -41,7 +43,7 @@ class Bot:
     # Handling any text or any multi media other than Commands
     async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Only admin is allowed to control the system
-        if not self.isAdmin:
+        if not self.isAdmin(update):
             return
         
         await update.message.chat.send_action(ChatAction.TYPING)
@@ -78,6 +80,9 @@ class Bot:
 
     # Send screenshot
     async def handle_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
         screenshot = getScreenshot()
         replyBody = ReplyBody()
@@ -86,6 +91,9 @@ class Bot:
     
     # Sends screenshot with grid overlay -> user can provide where to click
     async def handle_control(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
         img_bytes, zones = getScreenshotWithGrid()
         self.zone_store["zones"] = zones
@@ -111,6 +119,9 @@ class Bot:
 
     # Types whatever user sends and then press enter
     async def handle_type_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         if not context.args:
             await update.message.reply_text("Usage: /type hello world")
             return
@@ -122,6 +133,9 @@ class Bot:
 
     # Clicks on the center of the user provided grid
     async def handle_click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         label = update.message.text.strip().upper().split(" ")[1]
         zones = self.zone_store.get("zones", {})
         
@@ -136,7 +150,7 @@ class Bot:
 
     # Scroll the system by specified parameters
     async def handle_scroll(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self.isAdmin:
+        if not self.isAdmin(update):
             return
 
         try:
@@ -170,6 +184,9 @@ class Bot:
         await self.handle_control(update, context)
         
     async def debug(self, update: Update, contex: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         screen_w, screen_h = pyautogui.size()
         img = pyautogui.screenshot()
         img_w, img_h = img.size
@@ -181,6 +198,9 @@ class Bot:
 
     # Toggle Live mode to Send live screenshot when screen changes
     async def handle_live(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
         print("Handling live")
         if not context.args:
             await update.message.reply_text("Usage: /livemode on | off")
@@ -205,7 +225,7 @@ class Bot:
             await update.message.reply_text("🛑 Live mode stopped.")
 
     # Utilty function to send screenshot of live screen
-    async def stream_screen(self, context: ContextTypes.DEFAULT_TYPE):
+    async def stream_screen(self, context: ContextTypes.DEFAULT_TYPE):    
         while self.live_mode:
             screenshot = pyautogui.screenshot().convert("RGB")
             # Resize for speed (important!)
@@ -231,14 +251,53 @@ class Bot:
                     self.last_frame_hash = current_hash
                 except Exception as e:
                     print("Edit failed:", e)
+
+    # Takes photo from front camera and sends it.
+    async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
+        await update.message.chat.send_action(ChatAction.UPLOAD_PHOTO)
+
+        cap = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
+
+        if not cap.isOpened():
+            await update.message.reply_text("❌ Could not access camera.")
+            return
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        time.sleep(1)
+
+        for _ in range(5):
+            ret, frame = cap.read()
+
+        cap.release()
+
+        if not ret:
+            await update.message.reply_text("❌ Failed to capture image.")
+            return
+
+        success, buffer = cv2.imencode(".jpg", frame)
+
+        bio = io.BytesIO(buffer.tobytes())
+        bio.name = "photo.jpg"
+
+        await update.message.reply_photo(photo=bio, caption="📸 Photo captured")
         
     # Start of the bot -> Welcome message
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self.isAdmin(update):
+            return
+        
+        print(update.effective_user.id)
         welcome_text = (
             "🤖 *Remote Control Bot Activated*\n\n"
             "You can control this system using the commands below:\n\n"
             "📸 *Screen Controls*\n"
             "• /screenshot – Capture current screen\n"
+            "• /photo - Capture photo from camera"
             "• /control – Screenshot with clickable grid\n"
             "• /livemode on | off – Start/Stop live streaming\n\n"
             "🖱 *Mouse & Keyboard*\n"
