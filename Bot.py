@@ -179,6 +179,7 @@ class Bot:
             f"Scale factor: {img_w/screen_w}×{img_h/screen_h}"
         )
 
+    # Toggle Live mode to Send live screenshot when screen changes
     async def handle_live(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         print("Handling live")
         if not context.args:
@@ -203,6 +204,7 @@ class Bot:
             self.live_mode = False
             await update.message.reply_text("🛑 Live mode stopped.")
 
+    # Utilty function to send screenshot of live screen
     async def stream_screen(self, context: ContextTypes.DEFAULT_TYPE):
         while self.live_mode:
             screenshot = pyautogui.screenshot().convert("RGB")
@@ -230,10 +232,30 @@ class Bot:
                 except Exception as e:
                     print("Edit failed:", e)
         
+    # Start of the bot -> Welcome message
     async def handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        replyBody = ReplyBody()
-        replyBody.setText("Hey, I'm Alive")
-        await self.sendReply(update, replyBody)
+        welcome_text = (
+            "🤖 *Remote Control Bot Activated*\n\n"
+            "You can control this system using the commands below:\n\n"
+            "📸 *Screen Controls*\n"
+            "• /screenshot – Capture current screen\n"
+            "• /control – Screenshot with clickable grid\n"
+            "• /livemode on | off – Start/Stop live streaming\n\n"
+            "🖱 *Mouse & Keyboard*\n"
+            "• /click <zone> – Click grid zone (Example: /click B3)\n"
+            "• /scroll <direction> [amount] – Scroll screen\n"
+            "• /type <text> – Type text & press enter\n"
+            "• /press <key> – Press key or hotkey (ctrl+c)\n\n"
+            "🛠 *System*\n"
+            "• /debug – Screen resolution & scaling info\n\n"
+            "⚠️ Admin access only.\n"
+            "Ready when you are."
+        )
+
+        await update.message.reply_text(
+            welcome_text,
+            parse_mode="Markdown"
+        )
 
     def run(self):
         print("Bot Started...")
