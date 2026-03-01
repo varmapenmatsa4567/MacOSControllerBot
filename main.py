@@ -1,6 +1,11 @@
 from Bot import Bot
+from dotenv import load_dotenv
+import os
 
-BOT_TOKEN = "8676315013:AAHGZrhry4nLPNkQ3NG57OpjFl6lwpnlbUQ"
+load_dotenv()
 
-bot = Bot(BOT_TOKEN, "593940008")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = os.getenv("ADMIN_ID")
+
+bot = Bot(BOT_TOKEN, ADMIN_ID)
 bot.run()
